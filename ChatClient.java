@@ -8,6 +8,7 @@ import javax.swing.*;
 import java.awt.event.*;
 import javafx.*;
 import javafx.application.Application;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -15,6 +16,7 @@ import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
@@ -32,7 +34,7 @@ public class ChatClient extends Application {
 	private TextField incoming;
 	private TextArea outgoing;
 	private BufferedReader reader;
-	private PrintWriter writer;
+	private ClientObserver writer;
 	private AnchorPane anchorPane;
 	private TabPane tabPane;
 	private String userName;
@@ -46,17 +48,12 @@ public class ChatClient extends Application {
 	public void start(Stage primaryStage) throws Exception {
 		setUpNetworking();
 		initView();
-		usernameEntry();
 		primaryStage.setScene(new Scene(anchorPane, 1000, 650));
 		primaryStage.show();
-		writer.println(userName + " has connected to the chat");
-		writer.flush();
+		usernameEntry();
 	}
 	
 	private void initView() {
-		
-		
-		
 		components = new ArrayList<Node>();
 		anchorPane = new AnchorPane();
 		
@@ -71,6 +68,8 @@ public class ChatClient extends Application {
 		tabPane.getTabs().add(privateTab);
 		
 		incoming = new TextField();
+		incoming.setPrefWidth(300.0);
+		incoming.setPromptText("Enter message here");
 		components.add(incoming);
 		incoming.setOnAction(e -> {
 			String s = incoming.getText();
@@ -84,12 +83,15 @@ public class ChatClient extends Application {
 		
 		TextArea publicChat = new TextArea();
 		publicChat.setWrapText(true);
+		publicChat.setPrefSize(200, 600);
 		publicTab.setContent(publicChat);
 		TextArea privateChat = new TextArea();
 		privateChat.setWrapText(true);
 		privateTab.setContent(privateChat);
 		
-		
+		ListView<String> userList = new ListView<String>();
+		components.add(userList);
+		//userList.setItems((ObservableList<String>) ChatServer.getUsernames());
 		userName = "Tim";
 		
 		Button sendButton = new Button();
@@ -112,15 +114,17 @@ public class ChatClient extends Application {
 		AnchorPane.setRightAnchor(incoming, 100.0);
 		AnchorPane.setBottomAnchor(sendButton, 100.0);
 		AnchorPane.setRightAnchor(sendButton, 50.0);
-		
+		AnchorPane.setBottomAnchor(userList, 200.0);
+		AnchorPane.setRightAnchor(userList, 50.0);
 	}
 
 	private void setUpNetworking() throws Exception {
 		@SuppressWarnings("resource")
-		Socket sock = new Socket("127.0.0.1", 4242);
+		Socket sock = new Socket("192.168.0.6", 4243);
 		InputStreamReader streamReader = new InputStreamReader(sock.getInputStream());
+		OutputStream outStream = sock.getOutputStream();
 		reader = new BufferedReader(streamReader);
-		writer = new PrintWriter(sock.getOutputStream());
+		writer = new ClientObserver(sock.getOutputStream());
 		System.out.println("networking established");
 		Thread readerThread = new Thread(new IncomingReader());
 		readerThread.start();
@@ -161,6 +165,8 @@ public class ChatClient extends Application {
 	            public void handle(ActionEvent event) {
 	            	userName = inputUsername.getText();
 	            	stage.close();
+	            	writer.update(null, userName);
+	            	writer.update(null, userName + " has connected to the chat");
 	            }
 	       });
     	final GridPane inputGridPane = new GridPane();
@@ -178,5 +184,5 @@ public class ChatClient extends Application {
     	stage.setScene(new Scene(rootGroup));
     	stage.show();
 	}
-
+	
 }
