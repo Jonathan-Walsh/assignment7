@@ -11,7 +11,7 @@ import java.util.ArrayList;
 public class ChatServer {
 	private ArrayList<ClientObserver> clientOutputStreams;
 	private static UserList users;
-	
+
 	public static void main(String[] args) {
 		try {
 			new ChatServer().setUpNetworking();
@@ -33,6 +33,7 @@ public class ChatServer {
 			Thread t = new Thread(new ClientHandler(clientSocket));
 			t.start();
 			System.out.println("got a connection");
+			
 		}
 
 	}
@@ -68,7 +69,7 @@ public class ChatServer {
 		                synchronized (users) {
 		                    if (!users.contains(name)) {
 		                        users.addUser(name);
-		                        
+		                        notifyClients("$*B}!" + name);
 		                        break;
 		                    }
 		                }

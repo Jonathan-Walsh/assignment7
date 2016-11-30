@@ -39,7 +39,8 @@ public class ChatClient extends Application {
 	private TabPane tabPane;
 	private String userName;
 	private ArrayList<Node> components;
-
+	private ListView<String> userList;
+	
 	public static void main(String[] args) {
 		launch();
 	}
@@ -89,7 +90,7 @@ public class ChatClient extends Application {
 		privateChat.setWrapText(true);
 		privateTab.setContent(privateChat);
 		
-		ListView<String> userList = new ListView<String>();
+		userList = new ListView<String>();
 		components.add(userList);
 		//userList.setItems((ObservableList<String>) ChatServer.getUsernames());
 		userName = "Tim";
@@ -120,7 +121,7 @@ public class ChatClient extends Application {
 
 	private void setUpNetworking() throws Exception {
 		@SuppressWarnings("resource")
-		Socket sock = new Socket("192.168.0.6", 4243);
+		Socket sock = new Socket("10.145.64.231", 4243);
 		InputStreamReader streamReader = new InputStreamReader(sock.getInputStream());
 		OutputStream outStream = sock.getOutputStream();
 		reader = new BufferedReader(streamReader);
@@ -134,13 +135,19 @@ public class ChatClient extends Application {
 		public void run() {
 			String message;
 			try {
+				
 				while ((message = reader.readLine()) != null) {
+					if((message.length() < userName.length() + 7) || !(message.startsWith("$*B}!"))) {
 						Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
 						outgoing = (TextArea) currentTab.getContent();
 						if (outgoing instanceof TextArea) {
 							outgoing.appendText(message);
 							outgoing.appendText("\n");
 						}
+					}
+					if (message.startsWith("$*B}!")) {
+						userList.getItems().add(message.substring(5));
+					}
 				}
 			} catch (IOException ex) {
 				ex.printStackTrace();
