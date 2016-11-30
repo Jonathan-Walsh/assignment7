@@ -7,6 +7,8 @@ import java.util.Observable;
 import java.util.Observer;
 
 public class ClientObserver extends PrintWriter implements Observer {
+	String userName;
+	
 	public ClientObserver(OutputStream out) {
 		super(out);
 	}

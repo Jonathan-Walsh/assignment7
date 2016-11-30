@@ -3,11 +3,14 @@ package assignment7;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 
 import javax.swing.*;
 import java.awt.event.*;
 import javafx.*;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -16,9 +19,11 @@ import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TabPane.TabClosingPolicy;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
@@ -40,6 +45,7 @@ public class ChatClient extends Application {
 	private String userName;
 	private ArrayList<Node> components;
 	private ListView<String> userList;
+	private HashSet<String> userNames;
 	
 	public static void main(String[] args) {
 		launch();
@@ -47,6 +53,7 @@ public class ChatClient extends Application {
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
+		userNames = new HashSet<String>();
 		setUpNetworking();
 		initView();
 		primaryStage.setScene(new Scene(anchorPane, 1000, 650));
@@ -60,6 +67,7 @@ public class ChatClient extends Application {
 		
 		tabPane = new TabPane();
 		components.add(tabPane);
+		tabPane.setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
 		
 		Tab publicTab = new Tab();
 		publicTab.setText("Public");
@@ -70,7 +78,7 @@ public class ChatClient extends Application {
 		
 		incoming = new TextField();
 		incoming.setPrefWidth(300.0);
-		incoming.setPromptText("Enter message here");
+		incoming.setPromptText("Enter message here to send to everyone");
 		components.add(incoming);
 		incoming.setOnAction(e -> {
 			String s = incoming.getText();
@@ -93,8 +101,11 @@ public class ChatClient extends Application {
 		userList = new ListView<String>();
 		components.add(userList);
 		//userList.setItems((ObservableList<String>) ChatServer.getUsernames());
-		userName = "Tim";
 		
+		Label userListLabel = new Label();
+		userListLabel.setText("Users Online");
+		components.add(userListLabel);
+
 		Button sendButton = new Button();
 		sendButton.setText("Send");
 		components.add(sendButton);
@@ -110,18 +121,31 @@ public class ChatClient extends Application {
 	    	}
 	    });
 		
+		Button sendPrivateButton = new Button();
+		sendPrivateButton.setText("Send Private");
+		components.add(sendPrivateButton);
+		sendPrivateButton.setOnAction(new EventHandler<ActionEvent>(){
+	    	public void handle(ActionEvent event){
+	    		sendPrivateMessage();
+	    	}
+	    });
+		
 		anchorPane.getChildren().addAll(components);
 		AnchorPane.setBottomAnchor(incoming, 100.0);
 		AnchorPane.setRightAnchor(incoming, 100.0);
 		AnchorPane.setBottomAnchor(sendButton, 100.0);
 		AnchorPane.setRightAnchor(sendButton, 50.0);
+		AnchorPane.setBottomAnchor(sendPrivateButton, 175.0);
+		AnchorPane.setRightAnchor(sendPrivateButton, 50.0);
 		AnchorPane.setBottomAnchor(userList, 200.0);
 		AnchorPane.setRightAnchor(userList, 50.0);
+		AnchorPane.setBottomAnchor(userListLabel, 600.0);
+		AnchorPane.setRightAnchor(userListLabel, 50.0);
 	}
 
 	private void setUpNetworking() throws Exception {
 		@SuppressWarnings("resource")
-		Socket sock = new Socket("10.145.64.231", 4243);
+		Socket sock = new Socket("127.0.0.1", 4243);
 		InputStreamReader streamReader = new InputStreamReader(sock.getInputStream());
 		OutputStream outStream = sock.getOutputStream();
 		reader = new BufferedReader(streamReader);
@@ -137,7 +161,7 @@ public class ChatClient extends Application {
 			try {
 				
 				while ((message = reader.readLine()) != null) {
-					if((message.length() < userName.length() + 7) || !(message.startsWith("$*B}!"))) {
+					if (!message.startsWith("NAME:") && !message.startsWith("ADDNAME:")) {
 						Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
 						outgoing = (TextArea) currentTab.getContent();
 						if (outgoing instanceof TextArea) {
@@ -145,8 +169,18 @@ public class ChatClient extends Application {
 							outgoing.appendText("\n");
 						}
 					}
-					if (message.startsWith("$*B}!")) {
-						userList.getItems().add(message.substring(5));
+					else if (message.startsWith("NAME:")) {
+						if (!userNames.contains(message)) {
+							userNames.add(message);
+						}
+						if (!userList.getItems().contains(message.substring(5))) {
+							userList.getItems().add(message.substring(5));
+						}
+					}
+					else if (message.startsWith("ADDNAME:")) {
+						if (!userNames.contains(message)) {
+							userNames.add(message.substring(3));
+						}
 					}
 				}
 			} catch (IOException ex) {
@@ -155,7 +189,8 @@ public class ChatClient extends Application {
 		}
 	}
 	
-	private void usernameEntry() {		
+	
+	private void usernameEntry() {
 		final Stage stage = new Stage();
 		Button btn4 = new Button();
 		btn4.setText("Enter");
@@ -170,10 +205,18 @@ public class ChatClient extends Application {
 	        new EventHandler<ActionEvent>() {
 	            @Override
 	            public void handle(ActionEvent event) {
+	            	System.out.println(Arrays.toString(userNames.toArray()));
 	            	userName = inputUsername.getText();
+	            	if (!userNames.contains("NAME:" + userName)) {
 	            	stage.close();
 	            	writer.update(null, userName);
 	            	writer.update(null, userName + " has connected to the chat");
+	            	}
+	            	else {
+	            		inputUsername.clear();
+	            		inputUsername.setPromptText("Username already in use");
+	            	}
+	            	
 	            }
 	       });
     	final GridPane inputGridPane = new GridPane();
@@ -190,6 +233,26 @@ public class ChatClient extends Application {
     	rootGroup.setPadding(new Insets(12, 12, 12, 12));
     	stage.setScene(new Scene(rootGroup));
     	stage.show();
+	}
+	
+	private void sendPrivateMessage() {
+		if (userList.getSelectionModel().isEmpty()) {
+			incoming.clear();
+			incoming.setPromptText("Select a user to private message first");
+		}
+		else {
+			String s = incoming.getText();
+			String receiver = userList.getSelectionModel().getSelectedItem();
+			String rLen = Integer.toString(receiver.length());
+			String sender = userName;
+			String sLen = Integer.toString(sender.length());
+			s= "PRIVATE:" + sLen + "," + rLen + "," + sender + receiver +s;
+			writer.println(s);
+			writer.flush();
+			incoming.clear();
+			anchorPane.getChildren().clear();
+			anchorPane.getChildren().addAll(components);
+		}
 	}
 	
 }
