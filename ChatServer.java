@@ -15,7 +15,7 @@ public class ChatServer {
 		try {
 			new ChatServer().setUpNetworking();
 		} catch (Exception e) {
-			e.printStackTrace();
+			e.printStackTrace();//winning
 		}
 	}
 
