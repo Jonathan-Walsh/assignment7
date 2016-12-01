@@ -1,3 +1,15 @@
+/* CHATROOM <ChatClient.java>
+ * EE422C Project 7 submission by
+ * Replace <...> with your actual data.
+ * Jonathan Walsh
+ * jlw4699
+ * 16450
+ * Tim Yoder
+ * tjy263
+ * 16450
+ * Slip days used: <1>
+ * Fall 2016
+ */
 package assignment7;
 
 import java.io.*;
@@ -37,10 +49,12 @@ import javafx.stage.Stage;
 
 public class ChatClient extends Application {
 	private TextField incoming;
+	private TextField privateText;
 	private TextArea outgoing;
 	private BufferedReader reader;
 	private ClientObserver writer;
 	private AnchorPane anchorPane;
+	private Label currentUser;
 	private TabPane tabPane;
 	private String userName;
 	private ArrayList<Node> components;
@@ -59,6 +73,11 @@ public class ChatClient extends Application {
 		primaryStage.setScene(new Scene(anchorPane, 1000, 650));
 		primaryStage.show();
 		usernameEntry();
+		primaryStage.setOnCloseRequest(
+				event -> {
+					System.exit(0);
+				}
+				);
 	}
 	
 	private void initView() {
@@ -77,7 +96,7 @@ public class ChatClient extends Application {
 		tabPane.getTabs().add(privateTab);
 		
 		incoming = new TextField();
-		incoming.setPrefWidth(300.0);
+		incoming.setPrefWidth(250.0);
 		incoming.setPromptText("Enter message here to send to everyone");
 		components.add(incoming);
 		incoming.setOnAction(e -> {
@@ -88,6 +107,14 @@ public class ChatClient extends Application {
     		incoming.clear();
     		anchorPane.getChildren().clear();
     		anchorPane.getChildren().addAll(components);
+		});
+		
+		privateText = new TextField();
+		privateText.setPrefWidth(210.0);
+		privateText.setPromptText("Select a user from above");
+		components.add(privateText);
+		privateText.setOnAction(e -> {
+			sendPrivateMessage();
 		});
 		
 		TextArea publicChat = new TextArea();
@@ -106,8 +133,12 @@ public class ChatClient extends Application {
 		userListLabel.setText("Users Online");
 		components.add(userListLabel);
 
+		currentUser = new Label();
+		
+		components.add(currentUser);
+		
 		Button sendButton = new Button();
-		sendButton.setText("Send");
+		sendButton.setText("Send Message");
 		components.add(sendButton);
 		sendButton.setOnAction(new EventHandler<ActionEvent>(){
 	    	public void handle(ActionEvent event){
@@ -122,7 +153,7 @@ public class ChatClient extends Application {
 	    });
 		
 		Button sendPrivateButton = new Button();
-		sendPrivateButton.setText("Send Private");
+		sendPrivateButton.setText("Send Private Message");
 		components.add(sendPrivateButton);
 		sendPrivateButton.setOnAction(new EventHandler<ActionEvent>(){
 	    	public void handle(ActionEvent event){
@@ -132,15 +163,19 @@ public class ChatClient extends Application {
 		
 		anchorPane.getChildren().addAll(components);
 		AnchorPane.setBottomAnchor(incoming, 100.0);
-		AnchorPane.setRightAnchor(incoming, 100.0);
+		AnchorPane.setRightAnchor(incoming, 150.0);
 		AnchorPane.setBottomAnchor(sendButton, 100.0);
 		AnchorPane.setRightAnchor(sendButton, 50.0);
-		AnchorPane.setBottomAnchor(sendPrivateButton, 175.0);
+		AnchorPane.setBottomAnchor(sendPrivateButton, 160.0);
 		AnchorPane.setRightAnchor(sendPrivateButton, 50.0);
 		AnchorPane.setBottomAnchor(userList, 200.0);
 		AnchorPane.setRightAnchor(userList, 50.0);
 		AnchorPane.setBottomAnchor(userListLabel, 600.0);
 		AnchorPane.setRightAnchor(userListLabel, 50.0);
+		AnchorPane.setBottomAnchor(currentUser, 625.0);
+		AnchorPane.setRightAnchor(currentUser, 700.0);
+		AnchorPane.setBottomAnchor(privateText, 160.0);
+		AnchorPane.setRightAnchor(privateText, 190.0);
 	}
 
 	private void setUpNetworking() throws Exception {
@@ -161,8 +196,11 @@ public class ChatClient extends Application {
 			try {
 				
 				while ((message = reader.readLine()) != null) {
-					if (!message.startsWith("NAME:") && !message.startsWith("ADDNAME:")) {
-						Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
+					if (!message.startsWith("NAME:") && !message.startsWith("ADDNAME:") && !message.startsWith("REMOVE:")) {
+						Tab currentTab = tabPane.getTabs().get(0);
+						if (message.startsWith("Private")) {
+							currentTab = tabPane.getTabs().get(1);
+						}
 						outgoing = (TextArea) currentTab.getContent();
 						if (outgoing instanceof TextArea) {
 							outgoing.appendText(message);
@@ -182,9 +220,27 @@ public class ChatClient extends Application {
 							userNames.add(message.substring(3));
 						}
 					}
+					else if (message.startsWith("REMOVE:")) {
+						String closedUser = message.substring(7);
+						outgoing = (TextArea) tabPane.getTabs().get(0).getContent();
+						outgoing.appendText(closedUser + " has disconnected from the chat\n");
+						if (userNames.contains("NAME:" + closedUser)) {
+							userNames.remove("NAME:" + closedUser);
+						}
+						int len = userList.getItems().size();
+						for (int i = 0; i < len; i++) {
+							userList.getItems().set(i, "");
+						}
+						userList.getItems().clear();
+						for (String name: userNames) {
+							userList.getItems().add(name.substring(5));
+						}
+					}
 				}
 			} catch (IOException ex) {
-				ex.printStackTrace();
+			}
+			catch (IllegalStateException ex2) {
+				
 			}
 		}
 	}
@@ -196,7 +252,7 @@ public class ChatClient extends Application {
 		btn4.setText("Enter");
 
 		stage.initModality(Modality.APPLICATION_MODAL);
-		Text text = new Text(10, 40, "Enter your new Username here:");
+		Text text = new Text(10, 40, "Create a username:");
 		text.setFont(new Font(18));
 		TextField inputUsername = new TextField();
     	Scene scene = new Scene(new Group(inputUsername,text));
@@ -205,12 +261,20 @@ public class ChatClient extends Application {
 	        new EventHandler<ActionEvent>() {
 	            @Override
 	            public void handle(ActionEvent event) {
-	            	System.out.println(Arrays.toString(userNames.toArray()));
 	            	userName = inputUsername.getText();
-	            	if (!userNames.contains("NAME:" + userName)) {
+	            	if (userName.length() == 0) {
+	            		inputUsername.clear();
+	            		inputUsername.setPromptText("At least 1 character");
+	            	}
+	            	else if (userName.length() > 15) {
+	            		inputUsername.clear();
+	            		inputUsername.setPromptText("Less than 16 characters");
+	            	}
+	            	else if (!userNames.contains("NAME:" + userName)) {	
 	            	stage.close();
 	            	writer.update(null, userName);
 	            	writer.update(null, userName + " has connected to the chat");
+	            	currentUser.setText("You are signed in as: " + userName);
 	            	}
 	            	else {
 	            		inputUsername.clear();
@@ -219,6 +283,12 @@ public class ChatClient extends Application {
 	            	
 	            }
 	       });
+    	
+    	stage.setOnCloseRequest(
+    			event -> {
+    				System.exit(0);
+    			}
+    		);
     	final GridPane inputGridPane = new GridPane();
     
     	GridPane.setConstraints(inputUsername, 1, 0);
@@ -233,15 +303,16 @@ public class ChatClient extends Application {
     	rootGroup.setPadding(new Insets(12, 12, 12, 12));
     	stage.setScene(new Scene(rootGroup));
     	stage.show();
+
 	}
 	
 	private void sendPrivateMessage() {
 		if (userList.getSelectionModel().isEmpty()) {
-			incoming.clear();
-			incoming.setPromptText("Select a user to private message first");
+			privateText.clear();
+			privateText.setPromptText("Must select a user");
 		}
 		else {
-			String s = incoming.getText();
+			String s = privateText.getText();
 			String receiver = userList.getSelectionModel().getSelectedItem();
 			String rLen = Integer.toString(receiver.length());
 			String sender = userName;
@@ -249,7 +320,7 @@ public class ChatClient extends Application {
 			s= "PRIVATE:" + sLen + "," + rLen + "," + sender + receiver +s;
 			writer.println(s);
 			writer.flush();
-			incoming.clear();
+			privateText.clear();
 			anchorPane.getChildren().clear();
 			anchorPane.getChildren().addAll(components);
 		}

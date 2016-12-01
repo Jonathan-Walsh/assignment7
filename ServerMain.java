@@ -1,21 +1,34 @@
-package assignment7;
+/* CHATROOM <ServerMain.java>
+ * EE422C Project 7 submission by
+ * Replace <...> with your actual data.
+ * Jonathan Walsh
+ * jlw4699
+ * 16450
+ * Tim Yoder
+ * tjy263
+ * 16450
+ * Slip days used: <1>
+ * Fall 2016
+ */package assignment7;
 
+import assignment7.UserList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 
-public class ChatServer {
+public class ServerMain {
 	private ArrayList<ClientObserver> clientOutputStreams;
 	private static UserList users;
 	private int currentNumOnline;
 	
 	public static void main(String[] args) {
 		try {
-			new ChatServer().setUpNetworking();
+			new ServerMain().setUpNetworking();
 		} catch (Exception e) {
 			e.printStackTrace();//winning
 		}
@@ -31,10 +44,9 @@ public class ChatServer {
 			Socket clientSocket = serverSock.accept();
 			ClientObserver writer = new ClientObserver(clientSocket.getOutputStream());
 			clientOutputStreams.add(writer);
-
+			
 			Thread t = new Thread(new ClientHandler(clientSocket));
 			t.start();
-			//System.out.println("got a connection");
 			 ArrayList<String> userNames = users.getUsers();
              for (String userName : userNames) {
              	writer.update(null, "ADD" + userName);
@@ -53,12 +65,12 @@ public class ChatServer {
 
 	class ClientHandler implements Runnable {
 		private BufferedReader reader;
-		private PrintWriter writer;
-		
+		private Socket sock;
+		private String userName;
 		public ClientHandler(Socket clientSocket) throws IOException {
-			Socket sock = clientSocket;
+			sock = clientSocket;
 			reader = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-			writer = new  PrintWriter(sock.getOutputStream(), true);
+			userName = "";
 		}
 
 		public void run() {
@@ -73,6 +85,7 @@ public class ChatServer {
 		                synchronized (users) {
 		                    if (!users.contains(name)) {
 		                        users.addUser("NAME:" + name);
+		                        userName = name;
 		                        clientOutputStreams.get(currentNumOnline).userName = name;
 		                        currentNumOnline += 1;
 		                        ArrayList<String> userNames = users.getUsers();
@@ -84,7 +97,10 @@ public class ChatServer {
 		                }
 				}
 				catch (IOException e) {
-					e.printStackTrace();
+					try {
+						sock.close();
+					} catch (IOException e1) {
+					}
 				}  
 			} 
 			String message;
@@ -92,7 +108,6 @@ public class ChatServer {
 				while ((message = reader.readLine()) != null) {
 				//Private message
 				if (message.startsWith("PRIVATE:")) {
-					System.out.println(message);
 					message = message.substring(8);
 					int comma = message.indexOf(",");
 					int lenSender = Integer.parseInt(message.substring(0, comma));
@@ -102,7 +117,6 @@ public class ChatServer {
 					message = message.substring(comma + 1);
 					String sender = message.substring(0, lenSender);
 					String receiver = message.substring(lenSender, lenSender + lenReceiver);
-					System.out.println(sender + " " + receiver);
 					ClientObserver sendWriter = null;
 					ClientObserver receiveWriter = null;
 					for (ClientObserver cO : clientOutputStreams) {
@@ -117,7 +131,7 @@ public class ChatServer {
 					if (sendWriter != null && receiveWriter != null) {
 						sendWriter.println("Private message to " + receiver + ": " + message);
 						sendWriter.flush();
-						receiveWriter.println("Private message from " + receiver + ": " + message);
+						receiveWriter.println("Private message from " + sender + ": " + message);
 						receiveWriter.flush();
 					}
 					
@@ -128,7 +142,20 @@ public class ChatServer {
 					}
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				try {
+					sock.close();
+					ClientObserver cO = null;
+					for (ClientObserver c : clientOutputStreams) {
+						if (userName.equals(c.userName)) {
+							cO = c;
+						}
+					}
+					clientOutputStreams.remove(cO);
+					users.removeUser("NAME:" + userName);
+					currentNumOnline--;
+					notifyClients("REMOVE:" + userName);
+				} catch (IOException e1) {
+				}
 			}
 		}
 	}
@@ -141,27 +168,7 @@ public class ChatServer {
 //		return clientUsernames;
 	//}
 	
-	class UserList{
-			ArrayList<String> userList;
-		    public UserList() {
-		        userList = new ArrayList<String>();
-		    }
-		    
-		    public void addUser(String user) {
-		    	userList.add(user);
-		    }
-		    
-		    public boolean contains(String user) {
-		    	if (userList.contains(user)) {
-		    		return true;
-		    	}
-		    	return false;
-		    }   
-		    
-		    public ArrayList<String> getUsers() {
-		        return userList;
-		    }
-		}
+	
 
 	
 }
